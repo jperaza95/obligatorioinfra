@@ -1,16 +1,25 @@
 #!/bin/bash
 
 #Variables
+ARCHIVO_FLOTA="flota.csv"
 
 declare -A usuarios
 # -A es array asociativo.
 
-usuarios["admin"]="adm123"
+usuarios["a"]="a"
+usuarioLogueado=""
+
+categorias=("Scout" "Cargo" "Heavy" "Cooler" "Racer")
 
 #Funciones
 
-ingresarDron(){
-    echo "-- Ingresar dron --"
+esNumerico(){
+    local valor=$1
+    if[[ "$valor" =~ ^[0-9]+$ ]]; then
+        return 0
+    else
+        return 1
+    fi
 }
 
 signup(){
@@ -34,18 +43,127 @@ signup(){
     usuarios["$user"]="$pass"
 }
 
+login(){
+    echo "-- Login --"
+    read -r -p $'Usuario: \n' user
+    read -r -p $'Password: \n' pass
+
+    while ! [[ -v usuarios["$user"] && "${usuarios["$user"]}" == "$pass" ]]; do
+        echo -e "Error al intentar loguear. Pruebe nuevamente: \n"
+        read -r -p $'Usuario: \n' user
+        read -r -p $'Password: \n' pass
+    done
+
+    usuarioLogueado=$user;
+
+    echo "Usuario $usuarioLogueado logueado correctamente."
+    menuPrincipal
+    
+}
+
+logout(){
+    usuarioLogueado=""
+    menuSesion
+}
+
+mostrarCategorias(){
+    for c in "${!categorias[@]}"; do  # "!" recorre los indices de la lista.
+        echo "$c - ${categorias[$c]}" # ${categorias[c]} - categoria en la posicion i 
+        #"${#categorias[@]}" / tamaño del array
+    done
+}
+
+obtenerCategoriaPorIndice(){
+    local indice=$1
+
+    for ((i=0; i<${#categorias[@]}; i++)); do
+        if [ "$i" -eq "$indice" ]; then
+            echo "${categorias[i]}" #retorna el nombre de la categoria hacia afuera
+            return 0 #corta toda la funcion.
+        fi
+    done
+
+}
+
+aumentarEnUno(){
+    local actualId=$1 # recibo HEA-004
+    local prefijo="${actualId:0:4}" #extrae HEA-
+    local actualNumeros="${actualId: -3}" #extrae ultimos 3: 004
+    local siguienteNumeros=$((10#$actualNumeros+1)) # 10# : bash puede interpretar numeros que empiezan con cero como octales
+    printf "%s%03d\n" "$prefijo" "$siguienteNumeros" #HEA-005; ancho del numero es 3, rellenando con ceros a la izq
+   
+}
+
+asignarid(){
+    local categoria=$1 ## recibe categoria Heavy por ej.
+    local prefijo="${categoria:0:3}"  ##extrae Hea
+    prefijo="${prefijo^^}" ## Pasa a mayusc HEA
+
+
+    while IFS=, read -r ID CAT MODELO BATERIA DISP; do
+        if [ "${ID:0:3}" == "$prefijo" ]; then
+            echo $(aumentarEnUno "$ID")
+            return 0
+        fi
+    done < <(tail -n +2 "$ARCHIVO_FLOTA" | tac)  
+
+
+
+}
+ingresarModelo(){
+    read -r -p $'Ingrese el modelo: \n' modelo
+
+    while [[ -z "$modelo" ]]; do
+            read -r -p $'El modelo no puede estar vacio. Intente nuevamente: \n' modelo
+    done
+    echo $modelo
+}
+
+ingresarBateria(){
+    read -r -p $'Ingrese nivel de bateria: \n' bat
+
+    while [[ bat -lt 0 || bat -gt 100 ]]; do
+            read -r -p $'Ingrese un nivel de bateria entre 0 y 100\n' bat
+    done
+
+    echo $bat
+}
+
+
+ingresarDron(){
+    echo "**-- ALTA DE DRON --**"
+
+    local categoria=""
+    local id
+
+    #categoria
+    echo -e "Seleccione una categoría: \n"
+    mostrarCategorias
+    read -r  categ
+    categoria=$(obtenerCategoriaPorIndice "$categ") 
+    echo "Categoría seleccionada : $categoria"
+    id=$(asignarid "$categoria")
+
+    local modelo=$(ingresarModelo)
+    echo $modelo
+
+    #bateria
+    local bateria=$(ingresarBateria)
+
+}
+
 menuSesion(){
     while true; do
         echo
-        echo "-- Menú de sesión --"
+        echo "**-- BIENVENIDO --**"
         echo " 1 - Registrarse"
         echo " 2 - Log In"
-        echo " 3 - Volver al inicio"
+        echo " 3 - Salir"
         read -r -p "Opción: " opcion
 
         case "$opcion" in
             1) signup ;;
-            2) echo "login" ;;
+            2) login ;;
             3) return ;;
             *) echo "No se ingresó una opción válida." ;;
         esac
@@ -59,18 +177,18 @@ menuPrincipal (){
         echo "1 - Ingresar dron"  
         echo "2 - Asignar dron a reparto" 
         echo "3 - Actualizar dron"
-        echo "4 - Volver al inicio" 
+        echo "4 - Log Out" 
 
         read -r -p "Opción: " opcion
 
         case "$opcion" in 
-            1) echo "Ingresar Dron"
+            1) ingresarDron
                 ;;
             2) echo "Asignar dron a reparto"
                 ;;
             3) echo "Actualizar dron"
                 ;;    
-            4) return
+            4) logout
                 ;;             
             *) echo "No se ingresó una opción válida."
                 ;;
@@ -79,28 +197,28 @@ menuPrincipal (){
 }
 
 
-inicio(){
-    while true; do
+# inicio(){
+#     while true; do
 
-        read -r -p $'Sistema de Drones. Bienvenido \n 1 - Menú de sesión \n 2 - Menú Principal\n 3 - Salir\n' menuvalor
+#         read -r -p $'Sistema de Drones. Bienvenido \n 1 - Menú de sesión \n 2 - Menú Principal\n 3 - Salir\n' menuvalor
         
-        case "$menuvalor" in 
-            1) menuSesion
-                ;;
-            2) menuPrincipal
-                ;;
-            3) exit 0
-            ;;    
+#         case "$menuvalor" in 
+#             1) menuSesion
+#                 ;;
+#             2) menuPrincipal
+#                 ;;
+#             3) exit 0
+#             ;;    
 
-            *) echo "No se ingresó una opción válida."
-                ;;
-        esac   
+#             *) echo "No se ingresó una opción válida."
+#                 ;;
+#         esac   
 
-    done 
-}
+#     done 
+# }
 
 # Ejecutamos el inicio.
-inicio
+menuSesion
 
 
 # ACCION=$1
