@@ -15,7 +15,7 @@ categorias=("Scout" "Cargo" "Heavy" "Cooler" "Racer")
 
 esNumerico(){
     local valor=$1
-    if[[ "$valor" =~ ^[0-9]+$ ]]; then
+    if [[ "$valor" =~ ^[0-9]+$ ]]; then
         return 0
     else
         return 1
@@ -48,10 +48,14 @@ login(){
     read -r -p $'Usuario: \n' user
     read -r -p $'Password: \n' pass
 
-    while ! [[ -v usuarios["$user"] && "${usuarios["$user"]}" == "$pass" ]]; do
+    while true; do
+        if [[ -v usuarios["$user"] && "${usuarios["$user"]}" == "$pass" ]]; then
+            break
+        fi
         echo -e "Error al intentar loguear. Pruebe nuevamente: \n"
         read -r -p $'Usuario: \n' user
         read -r -p $'Password: \n' pass
+
     done
 
     usuarioLogueado=$user;
@@ -71,6 +75,19 @@ mostrarCategorias(){
         echo "$c - ${categorias[$c]}" # ${categorias[c]} - categoria en la posicion i 
         #"${#categorias[@]}" / tamaño del array
     done
+}
+
+ingresarCateg(){
+
+    read -r -p $'Seleccione una categoría: \n' categ
+    local n=${#categorias[@]} #Tamaño del array categorias.
+    while [[ -z "$categ" ]] || ! esNumerico "$categ" || ! (( categ >= 0 && categ < n )); do
+        read -r -p $'Error. Debe ingresar un valor numerico entre 0 y $((n-1)): \n'  categ
+    done
+
+    echo "$categ"
+
+
 }
 
 obtenerCategoriaPorIndice(){
@@ -113,42 +130,78 @@ asignarid(){
 ingresarModelo(){
     read -r -p $'Ingrese el modelo: \n' modelo
 
-    while [[ -z "$modelo" ]]; do
-            read -r -p $'El modelo no puede estar vacio. Intente nuevamente: \n' modelo
+    while true; do
+        if [[ -n "$modelo" ]]; then #si la variable no esta vacia rompemos el bucle.
+            break
+        fi
+        read -r -p $'El modelo no puede estar vacio. Intente nuevamente. \n' modelo
     done
     echo $modelo
 }
 
 ingresarBateria(){
-    read -r -p $'Ingrese nivel de bateria: \n' bat
 
-    while [[ bat -lt 0 || bat -gt 100 ]]; do
-            read -r -p $'Ingrese un nivel de bateria entre 0 y 100\n' bat
+    while true; do
+        read -r -p $'Ingrese nivel de bateria: \n' bat
+
+        if esNumerico "$bat" && [[ "$bat" -ge 0 && "$bat" -le 100 ]]; then
+            echo "$bat"
+            return 0
+        fi
+
+        echo "Ingrese un nivel de bateria entre 0 y 100\n"
     done
 
-    echo $bat
+}
+
+ingresarDisponible(){
+
+    while true; do
+        read -r -p $'Dron disponible?: (s/n)\n' disp
+
+        if [[ "${disp^^}" = "S" ]]; then
+            echo "Si"
+            return 0
+        elif [[ "${disp^^}" = "N" ]]; then
+            echo "No"
+            return 0
+        fi
+        echo "Valor invalido. Ingrese (s/n)" >&2
+
+    done
+
+
 }
 
 
 ingresarDron(){
     echo "**-- ALTA DE DRON --**"
-
-    local categoria=""
+    local categoria
     local id
-
-    #categoria
-    echo -e "Seleccione una categoría: \n"
     mostrarCategorias
-    read -r  categ
+    local categ=$(ingresarCateg) 
     categoria=$(obtenerCategoriaPorIndice "$categ") 
     echo "Categoría seleccionada : $categoria"
     id=$(asignarid "$categoria")
+    echo "Id generado: $id"
 
     local modelo=$(ingresarModelo)
     echo $modelo
 
     #bateria
     local bateria=$(ingresarBateria)
+    echo "Bateria ingresada: $bateria"
+
+    #disponible
+    local disponible=$(ingresarDisponible)
+    echo "$disponible"
+    
+    disponible_txt=$([ "$disponible" = "Si" ] && echo "Disponible" || echo "No Disponible")
+
+    echo "$id - $categoria - $modelo - $bateria% - $disponible_txt"
+    echo "$id,$categoria,$modelo,$bateria,$disponible" >> "$ARCHIVO_FLOTA"
+    echo "Dron ingresado exitosamente!" ## AGREGAR VALIDACION
+  
 
 }
 
@@ -197,25 +250,7 @@ menuPrincipal (){
 }
 
 
-# inicio(){
-#     while true; do
 
-#         read -r -p $'Sistema de Drones. Bienvenido \n 1 - Menú de sesión \n 2 - Menú Principal\n 3 - Salir\n' menuvalor
-        
-#         case "$menuvalor" in 
-#             1) menuSesion
-#                 ;;
-#             2) menuPrincipal
-#                 ;;
-#             3) exit 0
-#             ;;    
-
-#             *) echo "No se ingresó una opción válida."
-#                 ;;
-#         esac   
-
-#     done 
-# }
 
 # Ejecutamos el inicio.
 menuSesion
