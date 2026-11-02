@@ -9,6 +9,64 @@ declare -A usuarios
 usuarios["a"]="a"
 usuarioLogueado=""
 
+ejecutarAccion(){
+
+    local ACCION=$1
+    local PARAMETRO=$2
+    local NUEVA_BATERIA=$3
+
+    if [ -z "$ACCION" ]; then
+        echo -e "Error: Acción no especificada\n\tUso: ./don_drones_manager.sh <ACCIÓN> [PARÁMETRO]\n\tEj: ./don_drones_manager.sh bateria_critica"
+        exit 1
+    fi
+
+    case $ACCION in
+        bateria_critica)
+            CONTADOR=0
+            while IFS=, read -r ID CAT MODELO BATERIA DISP; do
+                if [ "$BATERIA" -lt "20" ]; then
+                    CONTADOR=$((CONTADOR + 1))
+                fi
+            done < <(tail -n +2 "$ARCHIVO_FLOTA")  
+            echo "Drones con batería crítica: $CONTADOR"
+            ;;
+
+            #En lugar de usar pipe (|), redirigimos la salida del tail al bucle while usando < <(...)
+            #Esto evita la creación de un subshell y hace que el bucle se ejecute en el mismo proceso principal.
+
+        asignar)
+            DRON=$(grep "^$PARAMETRO," "$ARCHIVO_FLOTA")
+            
+            DISPONIBLE=$(echo "$DRON" | cut -d',' -f5)
+            if [ "$DISPONIBLE" != "Si" ]; then
+                echo "Error: el dron $PARAMETRO no está disponible."
+                exit 1
+            fi
+
+            BATERIA_ACTUAL=$(grep "^$PARAMETRO," "$ARCHIVO_FLOTA" | cut -d',' -f4)
+            #cambiamos el operador > por -gt para comparar números en lugar de cadenas. 
+            #Además, en este contexto > se interpreta como redirección de salida, 
+            #creando un arhivo llamado "20" y redirigiendo la salida hacia él en lugar de realizar la comparación numérica deseada.
+
+            if [ "$BATERIA_ACTUAL" -gt "20" ]; then 
+                sed -i "s/^$PARAMETRO,\(.*\),Si$/$PARAMETRO,\1,No/" "$ARCHIVO_FLOTA"
+                echo "Dron $PARAMETRO asignado exitosamente."
+            else
+                echo "Error: Batería insuficiente."
+                exit 1
+            fi
+            ;;
+
+        *)
+            echo "Acción no reconocida."
+            exit 1
+            ;;
+        
+    esac
+}
+
+
+
 categorias=("Scout" "Cargo" "Heavy" "Cooler" "Racer")
 
 #Funciones
@@ -217,11 +275,99 @@ menuSesion(){
         case "$opcion" in
             1) signup ;;
             2) login ;;
-            3) return ;;
+            3) exit 0 ;;
             *) echo "No se ingresó una opción válida." ;;
         esac
     done
 }
+
+existeDron(){
+    local id=$1
+    local dronEncontrado=$(grep "^$id", "$ARCHIVO_FLOTA")
+
+    if [ -n "$dronEncontrado" ]; then 
+        return 0
+    else
+        return 1
+    fi
+
+
+}
+
+asignarDronAReparto(){
+
+    read -r -p $'Ingrese un ID de Dron: \n' idDron
+
+    while [[ -z "$idDron" ]] || ! existeDron "$idDron"; do
+        read -r -p $'El dron no existe, pruebe nuevamente: \n'  idDron
+    done
+
+    ejecutarAccion asignar "$idDron"
+
+
+}
+
+actualizarbateria(){
+    local idDron=$1
+    local nuevaBat=$2
+
+    sed -i "s/^\($idDron,[^,]*,[^,]*,\)[^,]*/\1$nuevaBat/" "$ARCHIVO_FLOTA"
+
+    #sed 's/TEXTO_A_BUSCAR/TEXTO_NUEVO/' flota.csv
+    #-i : modifica directamente al archivo flota.csv
+    #s: sustitucion
+    #^ : Comienzo de la linea
+    #\( : comienzo de grupo de captura; es el texto que quiero conservar
+    #, coma luego del idDron
+    #[^,]* captura cualquier contenido antes de encontrar otra coma (categoria)
+    #, coma luego de categoria
+    #[^,]* captura cualquier contenido antes de encontrar otra coma (modelo)
+    #, coma luego de modelo
+    #\) finaliza grupo de captura
+    #[^,]* busca el valor actual de la bateria
+
+    #\1 conserva todo lo capturado anteriormente (ID, categoría, modelo y comas)
+    #$nuevaBat coloca el nuevo porcentaje de bateria.
+
+}
+
+actualizarDisponibilidad(){
+    local idDron=$1
+    local nuevoDisp=$2
+
+    sed -i "s/^\($idDron,[^,]*,[^,]*,[^,]*,\)[^,]*/\1$nuevoDisp/" "$ARCHIVO_FLOTA"
+}
+
+actualizarDron(){
+    read -r -p $'Ingrese un ID de Dron: \n' idDron
+    while [[ -z "$idDron" ]] || ! existeDron "$idDron"; do
+        read -r -p $'El dron no existe, pruebe nuevamente: \n'  idDron
+    done
+
+    local bat=$(ingresarBateria)
+    actualizarbateria "$idDron" "$bat"
+
+    local disponible=$(ingresarDisponible)
+    actualizarDisponibilidad "$idDron" "$disponible"
+
+}
+
+listarDronesBateriaCritica(){
+    local CONTADOR=0
+    while IFS=, read -r ID CAT MODELO BATERIA DISP; do
+        if [ "$BATERIA" -lt "20" ]; then
+            echo "$ID - $CAT - $MODELO - $BATERIA% - $DISP"
+        fi
+    done < <(tail -n +2 "$ARCHIVO_FLOTA")  
+
+}
+
+
+reportes(){
+    ejecutarAccion bateria_critica
+    listarDronesBateriaCritica
+}
+
 
 menuPrincipal (){
 
@@ -230,18 +376,21 @@ menuPrincipal (){
         echo "1 - Ingresar dron"  
         echo "2 - Asignar dron a reparto" 
         echo "3 - Actualizar dron"
-        echo "4 - Log Out" 
+        echo "4 - Reporte de estado de flota"
+        echo "5 - Log Out" 
 
         read -r -p "Opción: " opcion
 
         case "$opcion" in 
             1) ingresarDron
                 ;;
-            2) echo "Asignar dron a reparto"
+            2) asignarDronAReparto
                 ;;
-            3) echo "Actualizar dron"
+            3) actualizarDron
                 ;;    
-            4) logout
+            4) reportes
+                ;;    
+            5) logout
                 ;;             
             *) echo "No se ingresó una opción válida."
                 ;;
@@ -255,56 +404,3 @@ menuPrincipal (){
 # Ejecutamos el inicio.
 menuSesion
 
-
-# ACCION=$1
-# PARAMETRO=$2
-# ARCHIVO_FLOTA="flota.csv"
-
-# if [ -z "$ACCION" ]; then
-#     echo -e "Error: Acción no especificada\n\tUso: ./don_drones_manager.sh <ACCIÓN> [PARÁMETRO]\n\tEj: ./don_drones_manager.sh bateria_critica"
-#     exit 1
-# fi
-
-# case $ACCION in
-#     bateria_critica)
-#         CONTADOR=0
-#         while IFS=, read -r ID CAT MODELO BATERIA DISP; do
-#             if [ "$BATERIA" -lt "20" ]; then
-#                 CONTADOR=$((CONTADOR + 1))
-#             fi
-#         done < <(tail -n +2 "$ARCHIVO_FLOTA")  
-#         echo "Drones con batería crítica: $CONTADOR"
-#         ;;
-
-#         #En lugar de usar pipe (|), redirigimos la salida del tail al bucle while usando < <(...)
-#         #Esto evita la creación de un subshell y hace que el bucle se ejecute en el mismo proceso principal.
-
-#     asignar)
-#         DRON=$(grep "^$PARAMETRO," "$ARCHIVO_FLOTA")
-        
-#         DISPONIBLE=$(echo "$DRON" | cut -d',' -f5)
-#         if [ "$DISPONIBLE" != "Si" ]; then
-#             echo "Error: el dron $PARAMETRO no está disponible."
-#             exit 1
-#         fi
-
-#         BATERIA_ACTUAL=$(grep "^$PARAMETRO," "$ARCHIVO_FLOTA" | cut -d',' -f4)
-#         #cambiamos el operador > por -gt para comparar números en lugar de cadenas. 
-#         #Además, en este contexto > se interpreta como redirección de salida, 
-#         #creando un arhivo llamado "20" y redirigiendo la salida hacia él en lugar de realizar la comparación numérica deseada.
-
-#         if [ "$BATERIA_ACTUAL" -gt "20" ]; then 
-#             sed -i "s/^$PARAMETRO,\(.*\),Si$/$PARAMETRO,\1,No/" "$ARCHIVO_FLOTA"
-#             echo "Dron $PARAMETRO asignado exitosamente."
-#         else
-#             echo "Error: Batería insuficiente."
-#             exit 1
-#         fi
-#         ;;
-
-#     *)
-#         echo "Acción no reconocida."
-#         exit 1
-#         ;;
-    
-# esac

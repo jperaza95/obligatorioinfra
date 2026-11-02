@@ -1,11 +1,11 @@
 ID,Categoria,Modelo,Bateria,Disponible
 SCO-001,Scout,FalconEye Mini,85,No
-SCO-002,Scout,FalconEye Mini,15,Si
+SCO-002,Scout,FalconEye Mini,98,No
 CAR-001,Cargo,SkyHauler X2,98,Si
-CAR-002,Cargo,SkyHauler X2,42,Si
+CAR-002,Cargo,SkyHauler X2,42,No
 CAR-003,Cargo,SkyHauler X1,8,Si
-CAR-004,Cargo,SkyHauler X2,76,No
-HEA-001,Heavy,TitanLift 20,60,Si
+CAR-004,Cargo,SkyHauler X2,27,No
+HEA-001,Heavy,TitanLift 20,60,No
 HEA-002,Heavy,TitanLift 20,19,Si
 HEA-003,Heavy,TitanLift Pro,90,No
 COO-001,Cooler,FreshWing R1,55,No
@@ -14,10 +14,12 @@ COO-003,Cooler,FreshWing R2,88,No
 RAC-001,Racer,BoltStrike V3,99,No
 RAC-002,Racer,BoltStrike V3,5,Si
 RAC-003,Racer,BoltStrike V2,33,No
-SCO-003,Scout,FalconEye Pro,70,Si
-CAR-005,Cargo,SkyHauler X1,25,Si
+SCO-003,Scout,FalconEye Pro,70,No
+CAR-005,Cargo,SkyHauler X1,25,No
 HEA-004,Heavy,TitanLift Pro,3,No
 COO-004,Cooler,FreshWing R2,64,No
-RAC-004,Racer,BoltStrike V3,18,Si
+RAC-004,Racer,BoltStrike V3,88,Si
 RAC-005,Racer,Mustang,76,Si
 RAC-006,Racer,rere,44,No
+SCO-004,Scout,lolol,98,Si
+HEA-005,Heavy,mustang,88,Si
